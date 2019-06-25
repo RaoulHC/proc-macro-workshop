@@ -42,6 +42,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
             #name: Option<#ty>
         }
     });
+
     let builder_struct = quote! {
         pub struct #builder_name {
             #(#builder_fields),*
@@ -59,15 +60,41 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
     });
 
+    let build_checks = named_fields.iter().map(|x| {
+        let name = &x.ident;
+        quote! {
+            let #name = match self.#name {
+                Some(x) => Ok(x),
+                None => Err(Box::<dyn Error>::from(
+                    "Missing")),
+            }?;
+        }
+    });
+
+    let build_construct = named_fields.iter().map(|x| {
+        let name = &x.ident;
+        quote!{ #name }
+    });
+
+    let build_method = quote! {
+        pub fn build(self) -> Result<#id, Box<dyn Error>> {
+            #(#build_checks)*
+            Ok(#id {
+                #(#build_construct),*
+            })
+        }
+    };
+
     let builder_impl = quote! {
         impl #builder_name {
             #(#call_setters)*
+            #build_method
         }
     };
 
     let total = quote!{
-        #builder
         #builder_struct
+        #builder
         #builder_impl
     };
 
