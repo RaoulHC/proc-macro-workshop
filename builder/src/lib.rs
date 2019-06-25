@@ -24,6 +24,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         quote!{#name: None}
     });
 
+    // name of the builder structure
     let builder_name = Ident::new(&format!("{}Builder", id), Span::call_site());
 
     let builder = quote!{
@@ -62,9 +63,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let build_checks = named_fields.iter().map(|x| {
         let name = &x.ident;
+        let ty = &x.ty;
         quote! {
-            let #name = match self.#name {
-                Some(x) => Ok(x),
+            let #name: #ty = match &self.#name {
+                Some(x) => Ok(x.to_owned()),
                 None => Err(Box::<dyn Error>::from(
                     "Missing")),
             }?;
@@ -77,11 +79,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
     });
 
     let build_method = quote! {
-        pub fn build(self) -> Result<#id, Box<dyn Error>> {
+        pub fn build(&mut self) -> Result<#id, Box<dyn Error>> {
             #(#build_checks)*
-            Ok(#id {
+            let built = #id {
                 #(#build_construct),*
-            })
+            };
+            Ok(built)
         }
     };
 
